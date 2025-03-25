@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Grid World</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #000;
+        font-family: "Orbitron", sans-serif;
+        color: #fff;
+      }
+
+      canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+      }
+
+      .control-container {
+        text-align: center;
+        margin: 20px 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      .grid-container {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin: 20px 0;
+        position: relative;
+        z-index: 1;
+        max-width: 100%;
+      }
+
+      .grid-section {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+
+      table {
+        border-collapse: collapse;
+        margin: 0 auto;
+      }
+
+      td {
+        width: 40px;
+        height: 40px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        text-align: center;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        color: #fff;
+        font-size: 12px;
+        position: relative;
+      }
+
+      .start {
+        background-color: rgba(0, 255, 0, 0.5);
+      }
+      .end {
+        background-color: rgba(255, 0, 0, 0.5);
+      }
+      .obstacle {
+        background-color: rgba(100, 100, 100, 0.5);
+      }
+      .path {
+        background-color: rgba(0, 191, 255, 0.7);
+      }
+
+      td:hover .tooltip {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      .tooltip {
+        visibility: hidden;
+        opacity: 0;
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 255, 204, 0.9);
+        color: #000;
+        padding: 2px 6px;
+        font-size: 10px;
+        border: 1px solid #00ffcc;
+        box-shadow: 0 0 5px #00ffcc;
+        z-index: 10;
+        transition: opacity 0.2s;
+      }
+
+      /* 飛船樣式 */
+      .ufo {
+        font-size: 25px;
+        display: block;
+        transition: transform 0.3s; /* 平滑轉向 */
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(0%, -50%); /* 置中 */
+      }
+
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        border: 2px solid #00ffcc;
+        border-radius: 0;
+        background: transparent;
+        color: #00ffcc;
+        cursor: pointer;
+        font-size: 14px;
+        text-transform: uppercase;
+        transition: all 0.3s;
+        box-shadow: 0 0 5px #00ffcc;
+      }
+
+      button:hover {
+        background: rgba(0, 255, 204, 0.2);
+        box-shadow: 0 0 15px #00ffcc;
+      }
+
+      input[type="number"] {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #00ffcc;
+        background: transparent;
+        color: #fff;
+        width: 60px;
+        font-size: 14px;
+      }
+
+      h3 {
+        margin: 10px 0;
+        color: #00ffcc;
+        text-shadow: 0 0 5px #00ffcc;
+        text-transform: uppercase;
+      }
+    </style>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <canvas id="stars"></canvas>
+
+    <div class="control-container">
+      <label>Grid Size (5-9):</label>
+      <input type="number" id="size" min="5" max="9" value="5" />
+      <button onclick="initGrid()">Initialize</button>
+      <button onclick="reset()">Reset</button>
+      <button onclick="calculate()">Calculate</button>
+      <button onclick="playPath()">Play Path</button>
+    </div>
+
+    <div class="control-container">
+      <h3>Main Grid</h3>
+      <table id="main-grid"></table>
+    </div>
+
+    <div class="grid-container">
+      <div class="grid-section">
+        <h3>Policy Evaluation Values</h3>
+        <table id="policy-eval-grid"></table>
+      </div>
+      <div class="grid-section">
+        <h3>Value Iteration Values</h3>
+        <table id="value-iter-values-grid"></table>
+      </div>
+      <div class="grid-section">
+        <h3>Value Iteration Policy</h3>
+        <table id="value-iter-policy-grid"></table>
+      </div>
+    </div>
+
+    <script>
+      // 星空動畫
+      const canvas = document.getElementById("stars");
+      const ctx = canvas.getContext("2d");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const stars = [];
+      for (let i = 0; i < 100; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 2,
+          speed: Math.random() * 0.5 + 0.1,
+        });
+      }
+
+      function animateStars() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        stars.forEach((star) => {
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255, 255, 255, " + Math.random() * 0.8 + ")";
+          ctx.fill();
+          star.y += star.speed;
+          if (star.y > canvas.height) star.y = 0;
+        });
+        requestAnimationFrame(animateStars);
+      }
+      animateStars();
+
+      // 熱力圖顏色映射
+      function getHeatmapColor(value, minVal, maxVal) {
+        if (value === null || isNaN(value)) return "rgba(100, 100, 100, 0.5)";
+        const ratio = (value - minVal) / (maxVal - minVal);
+        const r = Math.min(255, Math.floor(ratio * 255));
+        const b = Math.min(255, Math.floor((1 - ratio) * 255));
+        return `rgba(${r}, 0, ${b}, 0.7)`;
+      }
+
+      function initGrid() {
+        const size = document.getElementById("size").value;
+        fetch("/init_grid", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `size=${size}`,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            console.log("Init response:", data);
+            if (data.success) updateGrids();
+          })
+          .catch((error) => console.error("Init error:", error));
+      }
+
+      function reset() {
+        fetch("/reset", { method: "POST" })
+          .then((response) => response.json())
+          .then((data) => {
+            console.log("Reset response:", data);
+            if (data.success) {
+              clickMode = "start";
+              updateGrids();
+            }
+          })
+          .catch((error) => console.error("Reset error:", error));
+      }
+
+      function updateCell(x, y, type) {
+        fetch("/update_cell", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `x=${x}&y=${y}&type=${type}`,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            console.log("Update cell response:", data);
+            if (data.success) updateGrids();
+          })
+          .catch((error) => console.error("Update cell error:", error));
+      }
+
+      function calculate() {
+        console.log("Calculate button clicked");
+        fetch("/calculate", { method: "POST" })
+          .then((response) => response.json())
+          .then((data) => {
+            console.log("Calculate response:", data);
+            if (data.success) {
+              updateGrids();
+            } else {
+              alert(data.message || "Calculation failed");
+            }
+          })
+          .catch((error) => console.error("Calculate error:", error));
+      }
+
+      function updateGrids() {
+        console.log("Updating grids...");
+        fetch("/get_state")
+          .then((response) => response.json())
+          .then((state) => {
+            console.log("Fetched state:", state);
+            const size = state.size;
+            let mainHtml = "",
+              policyEvalHtml = "",
+              valueIterValuesHtml = "",
+              valueIterPolicyHtml = "";
+
+            let policyEvalMin = Infinity,
+              policyEvalMax = -Infinity;
+            let valueIterMin = Infinity,
+              valueIterMax = -Infinity;
+            if (state.policy_eval_values) {
+              for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                  const val = state.policy_eval_values[i][j];
+                  if (val !== null && !isNaN(val)) {
+                    policyEvalMin = Math.min(policyEvalMin, val);
+                    policyEvalMax = Math.max(policyEvalMax, val);
+                  }
+                }
+              }
+            }
+            if (state.value_iter_values) {
+              for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                  const val = state.value_iter_values[i][j];
+                  if (val !== null && !isNaN(val)) {
+                    valueIterMin = Math.min(valueIterMin, val);
+                    valueIterMax = Math.max(valueIterMax, val);
+                  }
+                }
+              }
+            }
+
+            for (let i = 0; i < size; i++) {
+              mainHtml += "<tr>";
+              policyEvalHtml += "<tr>";
+              valueIterValuesHtml += "<tr>";
+              valueIterPolicyHtml += "<tr>";
+              for (let j = 0; j < size; j++) {
+                let mainClass = "";
+                if (state.start && state.start[0] === i && state.start[1] === j)
+                  mainClass = "start";
+                else if (state.end && state.end[0] === i && state.end[1] === j)
+                  mainClass = "end";
+                else if (
+                  state.obstacles.some((obs) => obs[0] === i && obs[1] === j)
+                )
+                  mainClass = "obstacle";
+
+                mainHtml += `<td class="${mainClass}" onclick="cellClick(${i},${j})" id="cell-${i}-${j}"></td>`;
+
+                const policyEvalValue =
+                  state.policy_eval_values &&
+                  state.policy_eval_values[i] &&
+                  state.policy_eval_values[i][j] !== null
+                    ? Number(state.policy_eval_values[i][j])
+                    : null;
+                const valueIterValue =
+                  state.value_iter_values &&
+                  state.value_iter_values[i] &&
+                  state.value_iter_values[i][j] !== null
+                    ? Number(state.value_iter_values[i][j])
+                    : null;
+                const valueIterPolicyValue =
+                  state.value_iter_policy &&
+                  state.value_iter_policy[i] &&
+                  state.value_iter_policy[i][j]
+                    ? state.value_iter_policy[i][j]
+                    : "";
+
+                const policyEvalColor =
+                  policyEvalValue !== null
+                    ? getHeatmapColor(
+                        policyEvalValue,
+                        policyEvalMin,
+                        policyEvalMax
+                      )
+                    : "";
+                const valueIterColor =
+                  valueIterValue !== null
+                    ? getHeatmapColor(
+                        valueIterValue,
+                        valueIterMin,
+                        valueIterMax
+                      )
+                    : "";
+
+                const policyEvalDisplay =
+                  policyEvalValue !== null ? Math.round(policyEvalValue) : "";
+                const valueIterDisplay =
+                  valueIterValue !== null ? Math.round(valueIterValue) : "";
+                const policyEvalFull =
+                  policyEvalValue !== null ? policyEvalValue.toFixed(2) : "";
+                const valueIterFull =
+                  valueIterValue !== null ? valueIterValue.toFixed(2) : "";
+
+                policyEvalHtml += `<td style="background-color: ${policyEvalColor}">${policyEvalDisplay}<span class="tooltip">${policyEvalFull}</span></td>`;
+                valueIterValuesHtml += `<td style="background-color: ${valueIterColor}">${valueIterDisplay}<span class="tooltip">${valueIterFull}</span></td>`;
+                valueIterPolicyHtml += `<td>${valueIterPolicyValue}</td>`;
+              }
+              mainHtml += "</tr>";
+              policyEvalHtml += "</tr>";
+              valueIterValuesHtml += "</tr>";
+              valueIterPolicyHtml += "</tr>";
+            }
+
+            document.getElementById("main-grid").innerHTML = mainHtml;
+            document.getElementById("policy-eval-grid").innerHTML =
+              policyEvalHtml;
+            document.getElementById("value-iter-values-grid").innerHTML =
+              valueIterValuesHtml;
+            document.getElementById("value-iter-policy-grid").innerHTML =
+              valueIterPolicyHtml;
+            console.log("Grids updated successfully");
+          })
+          .catch((error) => console.error("Update grids error:", error));
+      }
+
+      let clickMode = "start";
+      function cellClick(x, y) {
+        if (clickMode === "start") {
+          updateCell(x, y, "start");
+          clickMode = "end";
+        } else if (clickMode === "end") {
+          updateCell(x, y, "end");
+          clickMode = "obstacle";
+        } else if (clickMode === "obstacle") {
+          updateCell(x, y, "obstacle");
+        }
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "1") clickMode = "start";
+        if (e.key === "2") clickMode = "end";
+        if (e.key === "3") clickMode = "obstacle";
+        console.log("Current mode:", clickMode);
+      });
+
+      function playPath() {
+        fetch("/get_state")
+          .then((response) => response.json())
+          .then((state) => {
+            if (!state.optimal_path || !state.value_iter_policy) {
+              alert("Please calculate the optimal path first!");
+              return;
+            }
+            const path = state.optimal_path;
+            const policy = state.value_iter_policy;
+            let step = 0;
+
+            // 重置格子內容，但保留起點和終點底色
+            const size = state.size;
+            for (let i = 0; i < size; i++) {
+              for (let j = 0; j < size; j++) {
+                const cell = document.getElementById(`cell-${i}-${j}`);
+                if (
+                  !cell.classList.contains("start") &&
+                  !cell.classList.contains("end")
+                ) {
+                  cell.innerHTML = "";
+                  cell.classList.remove("path");
+                } else {
+                  cell.innerHTML = "";
+                }
+              }
+            }
+
+            function animateStep() {
+              if (step >= path.length) return;
+
+              // 清除前一格的飛船（若不是起點或終點）
+              if (step > 0) {
+                const [prevI, prevJ] = path[step - 1];
+                const prevCell = document.getElementById(
+                  `cell-${prevI}-${prevJ}`
+                );
+                if (
+                  //   !prevCell.classList.contains("start") &&
+                  !prevCell.classList.contains("end")
+                ) {
+                  prevCell.innerHTML = "";
+                }
+              }
+
+              // 當前位置
+              const [i, j] = path[step];
+              const cell = document.getElementById(`cell-${i}-${j}`);
+
+              // 添加飛船並設置方向
+              if (step < path.length - 1) {
+                // 除了終點前一步，顯示飛船
+                const direction = policy[i][j];
+                let rotation = "0deg";
+                switch (direction) {
+                  case "↑":
+                    rotation = "315deg";
+                    break;
+                  case "↓":
+                    rotation = "135deg";
+                    break;
+                  case "←":
+                    rotation = "225deg";
+                    break;
+                  case "→":
+                    rotation = "45deg";
+                    break;
+                }
+                cell.innerHTML = `<span class="ufo" style="transform: rotate(${rotation}) translate(0%, 0%)">🚀</span>`;
+              } else {
+                // 終點顯示飛船並停留
+                cell.innerHTML = `<span class="ufo" style="transform: rotate(-45deg) translate(0%, -50%)">🚀</span>`;
+              }
+
+              // 添加軌跡（除了起點和終點）
+              if (
+                !cell.classList.contains("start") &&
+                !cell.classList.contains("end")
+              ) {
+                cell.classList.add("path");
+              }
+
+              step++;
+              setTimeout(animateStep, 150); // 每步間隔 500ms
+            }
+
+            animateStep();
+          })
+          .catch((error) => console.error("Play path error:", error));
+      }
+
+      updateGrids();
+    </script>
+  </body>
+</html>

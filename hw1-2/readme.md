@@ -34,11 +34,12 @@ This project is a web-based visualization tool for GridWorld, built using Flask 
    - Flask library installed (`pip install flask`).
 
 2. **Project Structure**:
-   GridWorld/
-   ├── app.py # Flask backend
-   ├── templates/
-   │ └── index.html # Frontend HTML with JavaScript and CSS
-   └── README.md # This file
+
+GridWorld/
+├── app.py
+├── templates/
+├──index.html
+└── README.md
 
 3. **Steps to Run**:
 

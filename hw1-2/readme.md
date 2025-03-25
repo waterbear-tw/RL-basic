@@ -22,7 +22,7 @@ This project is a web-based visualization tool for GridWorld, built using Flask 
 ### HW2: Perform Value of Value Iteration and the Path of GridWorld Question
 
 - **Objective**: Compute and display the values of Value Iteration, along with the optimal path from start to end.
-- **Implementation**: The application calculates Value Iteration values and policies, visualizes them with a heatmap, and animates the optimal path using a Rocket (🛸) icon that moves along the grid, leaving a trail and stopping at the endpoint.
+- **Implementation**: The application calculates Value Iteration values and policies, visualizes them with a heatmap, and animates the optimal path using a Rocket (🚀) icon that moves along the grid, leaving a trail and stopping at the endpoint.
 
 ---
 
@@ -35,11 +35,13 @@ This project is a web-based visualization tool for GridWorld, built using Flask 
 
 2. **Project Structure**:
 
+```
 GridWorld/
 ├── app.py
 ├── templates/
-├──index.html
+│ └── index.html
 └── README.md
+```
 
 3. **Steps to Run**:
 
